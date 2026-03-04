@@ -4,6 +4,48 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Unregister a participant from an activity
+  async function unregisterParticipant(activityName, email, li) {
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`,
+        { method: "POST" }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        li.remove();
+
+        // If no more participants, show placeholder
+        const list = document.querySelectorAll(".participants-list");
+        // find the parent list of this li
+        const parentList = li.parentElement;
+        const remaining = parentList.querySelectorAll("li.participant:not(.empty)").length;
+        if (remaining === 0) {
+          const placeholder = document.createElement("li");
+          placeholder.className = "participant empty";
+          placeholder.textContent = "No participants yet";
+          parentList.appendChild(placeholder);
+        }
+
+        messageDiv.textContent = result.message || "Participant removed";
+        messageDiv.className = "message success";
+        messageDiv.classList.remove("hidden");
+        setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+      } else {
+        messageDiv.textContent = result.detail || "Failed to remove participant";
+        messageDiv.className = "message error";
+        messageDiv.classList.remove("hidden");
+      }
+    } catch (error) {
+      messageDiv.textContent = "Failed to remove participant. Try again.";
+      messageDiv.className = "message error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error unregistering participant:", error);
+    }
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -26,6 +68,51 @@ document.addEventListener("DOMContentLoaded", () => {
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
         `;
+
+        // Build participants section
+        const participantsSection = document.createElement("div");
+        participantsSection.className = "participants-section";
+
+        const participantsTitle = document.createElement("h5");
+        participantsTitle.textContent = "Participants";
+        participantsSection.appendChild(participantsTitle);
+
+        const participantsList = document.createElement("ul");
+        participantsList.className = "participants-list";
+
+        if (Array.isArray(details.participants) && details.participants.length > 0) {
+          details.participants.forEach((p) => {
+            const li = document.createElement("li");
+            li.className = "participant";
+            li.dataset.email = p;
+            li.dataset.activity = name;
+
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = p;
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.type = "button";
+            deleteBtn.className = "participant-delete";
+            deleteBtn.title = `Remove ${p}`;
+            deleteBtn.innerHTML = "✖";
+            deleteBtn.addEventListener("click", () => {
+              if (!confirm(`Remove ${p} from ${name}?`)) return;
+              unregisterParticipant(name, p, li);
+            });
+
+            li.appendChild(nameSpan);
+            li.appendChild(deleteBtn);
+            participantsList.appendChild(li);
+          });
+        } else {
+          const li = document.createElement("li");
+          li.className = "participant empty";
+          li.textContent = "No participants yet";
+          participantsList.appendChild(li);
+        }
+
+        participantsSection.appendChild(participantsList);
+        activityCard.appendChild(participantsSection);
 
         activitiesList.appendChild(activityCard);
 
